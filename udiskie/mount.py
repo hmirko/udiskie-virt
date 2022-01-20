@@ -13,6 +13,8 @@ from .common import wraps, setdefault, exc_message, format_exc
 from .config import IgnoreDevice, match_config
 from .locale import _
 
+from .virtualmount import VirtualMount
+from .virtualmount import set_virtual_environment
 
 __all__ = ['Mounter']
 
@@ -87,6 +89,10 @@ class Mounter:
         self._cache = cache
         self._cache_hint = cache_hint
         self._log = logging.getLogger(__name__)
+
+        set_virtual_environment()
+
+        self._virtual_mounts = dict()
 
     def _find_device(self, device_or_path):
         """Find device object from path."""
@@ -191,6 +197,56 @@ class Mounter:
         self._log.debug(_('unmounting {0}', device))
         await device.unmount()
         self._log.info(_('unmounted {0}', device))
+        return True
+
+    @_error_boundary
+    async def mount_virt(self, device):
+        """
+        Mount the device if not already mounted.
+
+        :param device: device object, block device path or mount path
+        :returns: whether the device is mounted.
+        """
+        device = self._find_device(device)
+        if not self.is_handleable(device) or not device.is_filesystem:
+            self._log.warn(_('not mounting {0}: unhandled device', device))
+            return False
+        if device.is_mounted:
+            self._log.info(_('not mounting {0}: already mounted', device))
+            return True
+        options = match_config(self._config, device, 'options', None)
+        kwargs = dict(options=options)
+        self._log.debug(_('mounting {0} with {1}', device, kwargs))
+        self._check_device_before_mount(device)
+
+        dev_id = device.device_id
+        dev_path = "/dev/disk/by-id/" + dev_id
+        virt_mount_obj = VirtualMount(dev_path)
+
+        self._virtual_mounts[dev_id] = virt_mount_obj
+        self._log.info(_('virtually mounted {0} on {1}', dev_id, virt_mount_obj.mount_path()))
+        return True
+
+    @_error_boundary
+    async def virt_cleanup(self, device):
+        """
+        Find the corresponding virtual mount and delete it.
+
+        :param device: device object, block device path or mount path
+        :returns: whether the device is mounted.
+        """
+        device = self._find_device(device)
+        if not self.is_handleable(device) or not device.is_filesystem:
+            self._log.warn(_('not cleaning up {0}: unhandled device', device))
+            return False
+
+        dev_id = device.device_id
+
+        virt = self._virtual_mounts[dev_id]
+        virt.deactivate()
+        self._virtual_mounts[dev_id] = None
+        self._log.info(_('cleaned up {0}', dev_id))
+
         return True
 
     # unlock/lock (LUKS)
@@ -383,6 +439,86 @@ class Mounter:
         elif recursive and device.is_partition_table:
             tasks = [
                 self.auto_add(dev, recursive=True)
+                for dev in self.get_all_handleable()
+                if dev.is_partition and dev.partition_slave == device
+            ]
+            results = await gather(*tasks)
+            success = all(results)
+        else:
+            self._log.debug(_('not adding {0}: unhandled device', device))
+        return success
+
+    @_error_boundary
+    async def add_virt(self, device, recursive=None):
+        """
+        Mount or unlock the device depending on its type.
+
+        :param device: device object, block device path or mount path
+        :param bool recursive: recursively mount and unlock child devices
+        :returns: whether all attempted operations succeeded
+        """
+        device, created = await self._find_device_losetup(device)
+        if created and recursive is False:
+            return device
+        if device.is_filesystem:
+            success = await self.mount_virt(device)
+        elif device.is_crypto:
+            success = await self.unlock(device)
+            if success and recursive:
+                await self.udisks._sync()
+                device = self.udisks[device.object_path]
+                success = await self.add_virt(
+                    device.luks_cleartext_holder,
+                    recursive=True)
+        elif (recursive
+              and device.is_partition_table
+              and self.is_handleable(device)):
+            tasks = [
+                self.add_virt(dev, recursive=True)
+                for dev in self.get_all_handleable()
+                if dev.is_partition and dev.partition_slave == device
+            ]
+            results = await gather(*tasks)
+            success = all(results)
+        else:
+            self._log.info(_('not adding {0}: unhandled device', device))
+            return False
+        return success
+
+    @_error_boundary
+    async def auto_add_virt(self, device, recursive=None, automount=True):
+        """
+        Automatically attempt to mount or unlock a device, but be quiet if the
+        device is not supported.
+
+        :param device: device object, block device path or mount path
+        :param bool recursive: recursively mount and unlock child devices
+        :returns: whether all attempted operations succeeded
+        """
+        device, created = await self._find_device_losetup(device)
+        if created and recursive is False:
+            return device
+        if device.is_luks_cleartext and self.udisks.version_info >= (2, 7, 0):
+            await sleep(1.5)    # temporary workaround for #153, unreliable
+        success = True
+
+        if not self.is_automount(device, automount):
+            pass
+        elif device.is_filesystem:
+            if not device.is_mounted:
+                success = await self.mount_virt(device)
+        elif device.is_crypto:
+            if self._prompt and not device.is_unlocked:
+                success = await self.unlock(device)
+            if success and recursive:
+                await self.udisks._sync()
+                device = self.udisks[device.object_path]
+                success = await self.auto_add_virt(
+                    device.luks_cleartext_holder,
+                    recursive=True)
+        elif recursive and device.is_partition_table:
+            tasks = [
+                self.auto_add_virt(dev, recursive=True)
                 for dev in self.get_all_handleable()
                 if dev.is_partition and dev.partition_slave == device
             ]
