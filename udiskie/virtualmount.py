@@ -11,7 +11,7 @@ __all__ = ['VirtualMount', 'set_virtual_environment']
 
 def set_virtual_environment():
     # Set environment
-    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1003"
+    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
     os.environ["LIBGUESTFS_DEBUG"] = "0"
     os.environ["LIBGUESTFS_TRACE"] = "0"
 
