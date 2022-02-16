@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=diskie-virt
+Exec=udiskie-virt
+#Icon=<
+Comment=Modified udiskie capable of mounting in virtual machines
+X-GNOME-Autostart-enabled=true

@@ -64,8 +64,15 @@ class build_mo(Command):
 # rather than the *distutils* one to prevent errors when installing with pip
 # from the source distribution.
 class install(orig_install):
-    pass
+    def __init__(self, dist):
+        super(orig_install, self).__init__(dist)
+        self.install()
 
+    def run(self):
+        orig_install.run(self)
+
+    def install(self):
+        call("./script/install.sh install".split())
 
 def fast_entrypoint_script_template():
     """
