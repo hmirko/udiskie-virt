@@ -281,6 +281,9 @@ class Daemon(_EntryPoint):
         -a, --automount                         Automount new devices
         -A, --no-automount                      Disable automounting
 
+        --virtmount                             Mount new devices virtualy
+        --no-virtmount                          Disable virtual mounting
+
         -n, --notify                            Show popup notifications
         -N, --no-notify                         Disable notifications
 
@@ -317,6 +320,7 @@ class Daemon(_EntryPoint):
 
     option_defaults = extend(_EntryPoint.option_defaults, {
         'automount': True,
+        'virtmount': False,
         'notify': True,
         'tray': False,
         'menu': 'flat',
@@ -332,6 +336,7 @@ class Daemon(_EntryPoint):
 
     option_rules = extend(_EntryPoint.option_rules, {
         'automount': Switch('automount'),
+        'virtmount': Switch('virtmount'),
         'notify': Switch('notify'),
         'tray': Choice({
             '--tray': True,
@@ -424,7 +429,7 @@ class Daemon(_EntryPoint):
 
         self.notify = Component(self._load_notify)
         self.statusicon = Component(self._load_statusicon)
-        self.automounter = self._load_automounter(options['automount'])
+        self.automounter = self._load_automounter(automount=options['automount'], virtmount=options['virtmount'])
         self.automounter.activate()
 
         if options['notify']:
@@ -502,9 +507,9 @@ class Daemon(_EntryPoint):
         trayicon = TrayIcon(menu_maker, icons)
         return udiskie.tray.UdiskieStatusIcon(trayicon, menu_maker, smart)
 
-    def _load_automounter(self, automount):
+    def _load_automounter(self, automount, virtmount):
         import udiskie.automount
-        return udiskie.automount.AutoMounter(self.mounter, automount)
+        return udiskie.automount.AutoMounter(self.mounter, automount=automount, virtmount=virtmount)
 
 
 class Mount(_EntryPoint):
