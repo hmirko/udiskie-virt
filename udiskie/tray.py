@@ -201,6 +201,12 @@ class TrayMenu:
         ))
         menu.append(Gtk.SeparatorMenuItem())
         menu.append(self._menuitem(
+            _("Enable virtual mounting"),
+            icon=None,
+            onclick=lambda _: self._daemon.automounter.toggle_virtmount(),
+            checked=self._daemon.automounter.is_virtmount_on(),
+        ))
+        menu.append(self._menuitem(
             _("Enable automounting"),
             icon=None,
             onclick=lambda _: self._daemon.automounter.toggle_on(),
