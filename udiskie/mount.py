@@ -924,6 +924,16 @@ class DeviceActions:
         root = Device(None, [], None, "", [])
         device_nodes = dict(map(self._device_node,
                                 self._mounter.get_all_handleable()))
+
+        # hide loop devices
+        loop_devices = list()
+        for d in device_nodes:
+            if d.startswith("/org/freedesktop/UDisks2/block_devices/loop"):
+                loop_devices.append(d)
+
+        for l in loop_devices:
+            device_nodes.pop(l, None)
+
         # insert child devices as branches into their roots:
         for node in device_nodes.values():
             device_nodes.get(node.root, root).branches.append(node)
