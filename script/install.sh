@@ -7,6 +7,7 @@ SCRIPT_DIR=$(dirname $SCRIPT)
 case $1 in
 
     install)
+	echo "Installing udiskie-virt"
 	if [ -d $BIN_DIR ]; then
 	    cp "$SCRIPT_DIR"/udiskie-virt "$BIN_DIR"
 	fi
@@ -16,6 +17,7 @@ case $1 in
 	;;
 
     uninstall)
+	echo "Uninstalling udiskie-virt"
 	if [ -f $BIN_DIR/udiskie-virt ]; then
 	    rm "$BIN_DIR"/udiskie-virt
 	fi

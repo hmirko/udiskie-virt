@@ -63,6 +63,9 @@ class Icons:
         'forget_password': ['edit-delete'],
         'delete': ['udiskie-eject'],
         'losetup': ['udiskie-mount'],
+        'virtmount': ['udiskie-mount'],
+        'upvirtmount': ['udiskie-mount'],
+        'virtunmount': ['udiskie-unmount'],
         # checkbox workaround:
         'checked': ['checkbox-checked', 'udiskie-checkbox-checked'],
         'unchecked': ['checkbox', 'udiskie-checkbox-unchecked'],
@@ -158,6 +161,9 @@ class TrayMenu:
             'unlock',
             'detach',
             'delete',
+            'virtmount',
+            'upvirtmount',
+            'virtunmount',
             # suppressed:
             # 'unmount',
             # 'lock',

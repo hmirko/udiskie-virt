@@ -9,44 +9,63 @@ from pathlib import Path
 
 __all__ = ['VirtualMount', 'set_virtual_environment']
 
-def set_virtual_environment():
-    # Set environment
-    os.environ["XDG_RUNTIME_DIR"] = "/run/user/1000"
-    os.environ["LIBGUESTFS_DEBUG"] = "0"
-    os.environ["LIBGUESTFS_TRACE"] = "0"
+def set_virtual_environment(debug = False):
+    """
+    Set environment variables, enabling / disabling debug information
+    """
+    if debug:
+        val = "1"
+    else:
+        val = "0"
+
+    os.environ["LIBGUESTFS_DEBUG"] = val
+    os.environ["LIBGUESTFS_TRACE"] = val
 
 class VirtualMount:
-    """
-    Object used to keep track of a virtual mount
+    """Object used to keep track of a virtual mount.
+
+    Each filesystem which is mounted virtually has an associated
+    instance of VirtualMount. Due to the behaviour of the libguestfs
+    library a thread is spawned. The thread can only be terminate by
+    unmounting the mount on the host system (see
+    self._mount_path). The unmounting can be done by an external
+    programm such as a filemanager or using the tray.
+
+
     """
     iterator = itertools.count(start = 0).__next__
-    def __init__(self, device_path):
+
+    def __init__(self, device_path, label = None):
         self._active = True
         self._id = VirtualMount.iterator()
-        self._label = self.int_to_label(self._id)
+
+        if label == None:
+            self._label = self._int_to_label(self._id)
+        else:
+            self._label = label
 
         self._device_path = device_path
-        self._mount_path = '/media/libguestfs/' + self._label
+        self._mount_path = '/media/virtmount/' + self._label
 
         p = Path(self._mount_path)
-        p.mkdir(mode = 511, parents = True, exist_ok = True)
-
+        p.mkdir(mode = 755, parents = True, exist_ok = True)
         self._gfs = guestfs.GuestFS(python_return_dict=True)
 #        self._gfs.set_trace(1)
         self._gfs.add_drive_opts(self._device_path,
                                  format="raw",
                                  readonly=0,
-                                 label=self._label)
+                                 label=self._int_to_label(self._id))
+
         self._gfs.launch()
 
         devices = self._gfs.list_devices()
         mountable_device = devices[0]
         self._gfs.mount(mountable_device, "/")
-        self._gfs.mount_local(self._mount_path)
+        self._gfs.mount_local(self._mount_path, options="allow_other")
         self._thread = threading.Thread(target=self.thread_func, args=(1,))
         self._thread.start()
 
-    def int_to_label(self, i):
+    def _int_to_label(self, i):
         def digit_to_char(d):
             return chr(ord('A') + d)
 
@@ -72,6 +91,9 @@ class VirtualMount:
 
         return label
 
+    def is_active(self):
+        return self._active
+
     def id(self):
         return self._id
 
@@ -93,14 +115,21 @@ class VirtualMount:
 
     # thread running mount_local_run has lock of gfs handle
     # unmount() terminated the thread
+
+    def stop(self):
+        if self._active:
+            self.unmount()
+            time.sleep(0.1)
+            self.deactivate()
+
     def deactivate(self):
-        self._active = False
-        self.unmount()
-        time.sleep(0.3)
-        self._gfs.shutdown()
-        self._gfs.close()
+        if self._active:
+            self._active = False
+            self._gfs.shutdown()
+            self._gfs.close()
 
     def __del__(self):
+        print("destructor")
         if self._active:
             self.deactivate()
 

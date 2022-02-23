@@ -24,9 +24,6 @@ from .common import extend, ObjDictView
 from .locale import _
 from .async_ import Future, ensure_future, gather
 
-import guestfs
-import os
-
 __all__ = [
     'Daemon',
     'Mount',

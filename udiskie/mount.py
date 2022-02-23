@@ -7,6 +7,7 @@ from collections import namedtuple
 from functools import partial
 import logging
 import os
+from subprocess import check_output
 
 from .async_ import to_coro, gather, sleep
 from .common import wraps, setdefault, exc_message, format_exc
@@ -90,8 +91,15 @@ class Mounter:
         self._cache_hint = cache_hint
         self._log = logging.getLogger(__name__)
 
-        set_virtual_environment()
+        # Libguestfs runs outside of python itself.
+        # Using environment variables
+        if  self._log.getEffectiveLevel() <= logging.DEBUG:
+            set_virtual_environment(debug = True)
+        else:
+            set_virtual_environment(debug = False)
 
+
+        self._virt_cleanup()
         self._virtual_mounts = dict()
 
     def _find_device(self, device_or_path):
@@ -199,53 +207,141 @@ class Mounter:
         self._log.info(_('unmounted {0}', device))
         return True
 
-    @_error_boundary
-    async def mount_virt(self, device):
+
+    def _is_currently_virtualized(self, device):
         """
-        Mount the device if not already mounted.
+        Determine if a device is currently mounted virtually.
 
         :param device: device object, block device path or mount path
-        :returns: whether the device is mounted.
+        :returns: wheter the device is mounted virtually
+        """
+        # This function is necessary as device.is_mounted() only works
+        # on native mounts
+        device = self._find_device(device)
+        dev_id = device.device_id
+        if dev_id in self._virtual_mounts:
+            return True
+        else:
+            return False
+
+    @_error_boundary
+    async def upvirtmount(self, device):
+        """
+        Upgrade a virtually mounted device to a natively mounted device
+
+        :param device: device object, block device path or mount path
+        :returns: wheter the upgrade process was successful
+        """
+        self.virtunmount(device)
+        self.mount(device)
+        return True
+
+    @_error_boundary
+    async def virtunmount(self, device):
+        """
+        Unmount a virtually mounted device
+
+        :param device: device object, block device path or mount path
+        :returns: wheter the operation was successful
+        """
+        device = self._find_device(device)
+        if not self.is_handleable(device) or not device.is_filesystem:
+            self._log.warn(_('not unmounting {0}: unhandled device', device))
+            return False
+        if not self._is_currently_virtualized(device):
+            self._log.info(_('not unmounting {0}: not virtualized', device))
+            return True
+
+        self._log.debug(_('unmounting virtualized device {0}', device))
+
+        dev_id = device.device_id
+        dev_path = "/dev/disk/by-id/" + dev_id
+        id_label = device.id_label
+
+        vmount = self._virtual_mounts.pop(dev_id, None)
+        vmount.deactivate()
+        self._log.info(_('unmounted {0}', dev_id))
+        return True
+
+    def virtunmount_all(self):
+        """
+        Unmount all virtually mounted devices.
+
+        :returns: whether the operation was successful
+        """
+        for dev_id in self._virtual_mounts:
+            # get VirtMount instance
+            vm = self._virtual_mounts[dev_id]
+
+            if vm.is_active():
+                vm.stop()
+                self._virtual_mounts.pop(dev_id, None)
+
+        return True
+
+    @_error_boundary
+    async def virtmount(self, device):
+        """
+        Virtually mount the device if not already mounted.
+
+        :param device: device object, block device path or mount path
+        :returns: whether the operation was successful
         """
         device = self._find_device(device)
         if not self.is_handleable(device) or not device.is_filesystem:
             self._log.warn(_('not mounting {0}: unhandled device', device))
             return False
-        if device.is_mounted:
-            self._log.info(_('not mounting {0}: already mounted', device))
-            return True
-        options = match_config(self._config, device, 'options', None)
-        kwargs = dict(options=options)
-        self._log.debug(_('mounting {0} with {1}', device, kwargs))
-        self._check_device_before_mount(device)
+        self._log.debug(_('virtually mounting {0}', device))
 
         dev_id = device.device_id
         dev_path = "/dev/disk/by-id/" + dev_id
-        virt_mount_obj = VirtualMount(dev_path)
+        id_label = device.id_label
+
+        virt_mount_obj = VirtualMount(dev_path, label = id_label)
 
         self._virtual_mounts[dev_id] = virt_mount_obj
         self._log.info(_('virtually mounted {0} on {1}', dev_id, virt_mount_obj.mount_path()))
         return True
 
-    @_error_boundary
-    async def virt_cleanup(self, device):
+    def _virt_cleanup(self):
         """
-        Find the corresponding virtual mount and delete it.
+        Cleans up possible mounts from previous programm evocations.
 
-        :param device: device object, block device path or mount path
-        :returns: whether the device is mounted.
+        When a previous instance of the programm has not exited properly,
+        mount points might still be connected to a non existant
+        process. The process can not reuse the mount point.
+
+        Example error message:
+
+        failed to virtmount /org/freedesktop/UDisks2/block_devices/sdc1:
+        [Errno 107] Transport endpoint not connected
+
         """
-        device = self._find_device(device)
-        if not self.is_handleable(device) or not device.is_filesystem:
-            self._log.warn(_('not cleaning up {0}: unhandled device', device))
-            return False
+        out = check_output(['mount', '-t', 'fuse'])
+        lines = out.decode('utf-8').split('\n')
 
-        dev_id = device.device_id
+        if len(out) == 0:
+            self._log.debug('No old virtual mounts found')
+            return
+        else:
+            print(len(lines))
+
+        self._log.debug('%s old virtual mounts found' % (len(lines)))
+
+        for line in lines:
+            fields = line.split(' ')
+            print(fields)
+            # format is
+            # 0            1  2            3+
+            # /device/path on /mount/point ...
+            mountpoint = fields[2]
+            out = check_output(['guestunmount', mountpoint])
+            self._log.debug(out)
 
         virt = self._virtual_mounts[dev_id]
         virt.deactivate()
         self._virtual_mounts[dev_id] = None
-        self._log.info(_('cleaned up {0}', dev_id))
+
 
         return True
 
@@ -461,7 +557,7 @@ class Mounter:
         if created and recursive is False:
             return device
         if device.is_filesystem:
-            success = await self.mount_virt(device)
+            success = await self.virtmount(device)
         elif device.is_crypto:
             success = await self.unlock(device)
             if success and recursive:
@@ -506,7 +602,7 @@ class Mounter:
             pass
         elif device.is_filesystem:
             if not device.is_mounted:
-                success = await self.mount_virt(device)
+                success = await self.virtmount(device)
         elif device.is_crypto:
             if self._prompt and not device.is_unlocked:
                 success = await self.unlock(device)
@@ -896,6 +992,9 @@ class DeviceActions:
         'detach': _('Unpower {1}'),
         'forget_password': _('Clear password for {0}'),
         'delete': _('Detach {0}'),
+        'virtmount': _('Virtually mount {0}'),
+        'upvirtmount': _('Switch to native mount for {0}'),
+        'virtunmount': _('Unmount {0}'),
     }
 
     def __init__(self, mounter, actions={}):
@@ -912,6 +1011,9 @@ class DeviceActions:
             'detach': partial(mounter.detach, force=True),
             'forget_password': to_coro(mounter.forget_password),
             'delete': mounter.delete,
+            'virtmount': mounter.virtmount,
+            'upvirtmount': mounter.upvirtmount,
+            'virtunmount': mounter.virtunmount,
         })
 
     def detect(self, root_device='/'):
@@ -944,6 +1046,39 @@ class DeviceActions:
 
     def _get_device_methods(self, device):
         """Return an iterable over all available methods the device has."""
+
+        if self._mounter._is_currently_virtualized(device):
+            yield 'upvirtmount'
+            yield 'virtunmount'
+        else:
+            if device.is_filesystem:
+                if device.is_mounted:
+                    if self._mounter._browser:
+                        yield 'browse'
+                    if self._mounter._terminal:
+                        yield 'terminal'
+                    yield 'unmount'
+                else:
+                    yield 'mount'
+                    yield 'virtmount'
+            elif device.is_crypto:
+                if device.is_unlocked:
+                    yield 'lock'
+                else:
+                    yield 'unlock'
+                cache = self._mounter._cache
+                if cache and device in cache:
+                    yield 'forget_password'
+            if device.is_ejectable and device.has_media:
+                yield 'eject'
+            if device.is_detachable:
+                yield 'detach'
+            if device.is_loop:
+                yield 'delete'
+
+    def _get_device_methods1(self, device):
+        """Return an iterable over all available methods the device has."""
+
         if device.is_filesystem:
             if device.is_mounted:
                 if self._mounter._browser:

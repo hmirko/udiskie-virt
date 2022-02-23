@@ -4,13 +4,17 @@ Automount utility.
 import sys
 import traceback
 import asyncio
+import os
+
+# for ctrl-C handling
+import signal
 
 from .common import DaemonBase
 from .async_ import run_bg
 
+import guestfs
 
 __all__ = ['AutoMounter']
-
 
 class AutoMounter(DaemonBase):
 
@@ -36,6 +40,13 @@ class AutoMounter(DaemonBase):
             'media_added': self.auto_add,
             'device_removed': self.device_removed,
         }
+
+        signal.signal(signal.SIGINT, self.handle_sigint)
+
+    def handle_sigint(self, signal, frame):
+        print("Received SIGINT. Shutting down.")
+        self.shutdown()
+        sys.exit(0)
 
     def is_on(self):
         return self._automount
@@ -73,3 +84,6 @@ class AutoMounter(DaemonBase):
         coroutine = self._mounter.virt_cleanup(device)
         val = asyncio.run(coroutine)
         return val
+
+    def shutdown(self):
+        self._mounter.virtunmount_all()
