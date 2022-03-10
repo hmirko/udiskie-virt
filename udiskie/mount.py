@@ -99,7 +99,7 @@ class Mounter:
             set_virtual_environment(debug = False)
 
 
-        self._virt_cleanup()
+        self.virt_cleanup()
         self._virtual_mounts = dict()
 
     def _find_device(self, device_or_path):
@@ -259,7 +259,7 @@ class Mounter:
         id_label = device.id_label
 
         vmount = self._virtual_mounts.pop(dev_id, None)
-        vmount.deactivate()
+        vmount.stop()
         self._log.info(_('unmounted {0}', dev_id))
         return True
 
@@ -303,7 +303,7 @@ class Mounter:
         self._log.info(_('virtually mounted {0} on {1}', dev_id, virt_mount_obj.mount_path()))
         return True
 
-    def _virt_cleanup(self):
+    def virt_cleanup(self):
         """
         Cleans up possible mounts from previous programm evocations.
 
@@ -323,25 +323,21 @@ class Mounter:
         if len(out) == 0:
             self._log.debug('No old virtual mounts found')
             return
-        else:
-            print(len(lines))
 
         self._log.debug('%s old virtual mounts found' % (len(lines)))
 
         for line in lines:
-            fields = line.split(' ')
-            print(fields)
-            # format is
-            # 0            1  2            3+
-            # /device/path on /mount/point ...
-            mountpoint = fields[2]
-            out = check_output(['guestunmount', mountpoint])
-            self._log.debug(out)
-
-        virt = self._virtual_mounts[dev_id]
-        virt.deactivate()
-        self._virtual_mounts[dev_id] = None
-
+            if len(line) <= 1:
+                continue
+            else:
+                fields = line.split(' ')
+                print(fields)
+                # format is
+                # 0            1  2            3+
+                # /device/path on /mount/point ...
+                mountpoint = fields[2]
+                out = check_output(['guestunmount', mountpoint])
+                self._log.debug(out)
 
         return True
 

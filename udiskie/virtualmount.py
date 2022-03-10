@@ -41,14 +41,18 @@ class VirtualMount:
 
         if label == None:
             self._label = self._int_to_label(self._id)
+        elif len(label) == 0:
+            self._label = self._int_to_label(self._id)
         else:
             self._label = label
 
         self._device_path = device_path
         self._mount_path = '/media/virtmount/' + self._label
 
+        print(self._mount_path)
+
         p = Path(self._mount_path)
-        p.mkdir(mode = 755, parents = True, exist_ok = True)
+        p.mkdir(mode = 0o770, parents = True, exist_ok = True)
         self._gfs = guestfs.GuestFS(python_return_dict=True)
 #        self._gfs.set_trace(1)
         self._gfs.add_drive_opts(self._device_path,
