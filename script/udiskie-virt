@@ -1,2 +1,8 @@
 #!/bin/bash
+
+if [ "$1" = "--debug" ]
+then
+    echo "Enabling debug options for libguestfs"
+    export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1
+fi
 libguestfsrun udiskie "$@"
