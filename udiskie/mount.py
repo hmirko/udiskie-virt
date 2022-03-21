@@ -232,8 +232,8 @@ class Mounter:
         :param device: device object, block device path or mount path
         :returns: wheter the upgrade process was successful
         """
-        self.virtunmount(device)
-        self.mount(device)
+        await self.virtunmount(device)
+        await self.mount(device)
         return True
 
     @_error_boundary
