@@ -32,7 +32,7 @@ echo "Installing desktop entry"
 if [ -d $AUTO_DIR ]; then
     cp "$SCRIPT_DIR"/udiskie-virt.desktop "$AUTO_DIR"
 fi
-;;
+
 
 echo "Installing udiskie-virt."
 pip3 install -e $REPO_DIR
