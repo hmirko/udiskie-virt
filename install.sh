@@ -1,12 +1,14 @@
-!/bin/bash
+#!/bin/bash
 
 # Dependecies
 sudo apt install\
      udisks2\
      libguestfs-dev\
+     libguestfs-tools\
      python3\
      python3-pip\
-     python3-guestfs
+     python3-guestfs\
+     tint2
 
 
 #  Udiskie
@@ -44,7 +46,7 @@ echo "Addint $USER to virtmount. You will have to start a new session for this t
 sudo usermod -a -G $USER virtmount
 
 echo "Creating location for virtual mounts."
-mkdir -pv /media/virtmount
+sudo mkdir -pv /media/virtmount
 sudo chown -v virtmount:virtmount /media/virtmount
 
 # Ubuntu specific problem. Normal permissions not sufficient to read
