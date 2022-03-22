@@ -43,16 +43,25 @@ pip3 install -e $REPO_DIR
 echo "Creating group virtmount."
 sudo groupadd virtmount
 echo "Addint $USER to virtmount. You will have to start a new session for this to take effect."
-sudo usermod -a -G $USER virtmount
+sudo usermod -a -G virtmount $USER
 
 echo "Creating location for virtual mounts."
 sudo mkdir -pv /media/virtmount
-sudo chown -v virtmount:virtmount /media/virtmount
+sudo chgrp -v virtmount /media/virtmount
+sudo chmod g+w /media/virtmount
 
 # Ubuntu specific problem. Normal permissions not sufficient to read
 # kernel images
 echo "Giving users permissions to use the kernel image."
 sudo chmod 755 /boot/vmlinuz*
+
+
+echo "Installing udev rule."
+# https://unix.stackexchange.com/questions/333697/etc-udev-rules-d-vs-lib-udev-rules-d-which-to-use-and-why
+sudo cp "${REPO_DIR}/script/99-external-media.rules" /udev/rules.d
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
 
 # Checking
 echo "Checking correct install of libguestfs."

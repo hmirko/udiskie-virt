@@ -1,0 +1,2 @@
+ACTION=="add", ATTRS{removable}=="1", SUBSYSTEM=="block", OWNER="virtmount", GROUP="virtmount", MODE="0664"
+ACTION=="add", SUBSYSTEMS=="usb", SUBSYSTEM=="block", GROUP="virtmount", MODE="0664"
