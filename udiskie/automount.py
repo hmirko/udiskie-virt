@@ -81,7 +81,7 @@ class AutoMounter(DaemonBase):
 
     def device_removed(self, device):
         print("Device removed! %s Filesystem?: %s" % (device, device.is_filesystem))
-        coroutine = self._mounter.virt_cleanup(device)
+        coroutine = self._mounter.virt_cleanup()
         val = asyncio.run(coroutine)
         return val
 
