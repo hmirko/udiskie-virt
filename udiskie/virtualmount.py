@@ -65,7 +65,7 @@ class VirtualMount:
         devices = self._gfs.list_devices()
         mountable_device = devices[0]
         self._gfs.mount(mountable_device, "/")
-        self._gfs.mount_local(self._mount_path, options="allow_other")
+        self._gfs.mount_local(self._mount_path)
         self._thread = threading.Thread(target=self.thread_func, args=(1,))
         self._thread.start()
 
