@@ -3,7 +3,7 @@
 
 # Dependecies
 echo "Installing dependencies."
-sudo apt get update
+sudo apt update
 sudo apt install\
      udisks2\
      libguestfs-dev\
@@ -11,7 +11,7 @@ sudo apt install\
      python3\
      python3-pip\
      python3-guestfs\
-     tint2
+     qemu-kvm
 
 echo ""
 echo ""
@@ -49,8 +49,10 @@ echo ""
 # Group / Permission
 echo "Creating group virtmount."
 sudo groupadd virtmount
-echo "Add $USER to virtmount. You will have to start a new session for this to take effect."
+echo "Add $USER to virtmount group. You will have to start a new session for this to take effect."
 sudo usermod -a -G virtmount $USER
+echo "Add $USER to kvm group. You will have to start a new session for this to take effect."
+sudo usermod -a -G kvm $USER
 
 echo "Creating location for virtual mounts."
 sudo mkdir -pv /media/virtmount
@@ -59,8 +61,9 @@ sudo chmod g+w /media/virtmount
 
 # Ubuntu specific problem. Normal permissions not sufficient to read
 # kernel images
+# https://libguestfs.org/guestfs-faq.1.html
 echo "Giving users permissions to use the kernel image."
-sudo chmod 755 /boot/vmlinuz*
+sudo chmod 0644 /boot/vmlinuz*
 
 echo "Installing udev rule."
 # https://unix.stackexchange.com/questions/333697/etc-udev-rules-d-vs-lib-udev-rules-d-which-to-use-and-why
@@ -95,11 +98,15 @@ fi
 case $desktop_environment in
     "ubuntu" | "ubuntu:gnome" | "ubuntu:GNOME")
 	gsettings set org.gnome.desktop.media-handling automount false
+	gsettings set org.gnome.desktop.media-handling automount-open false
 
 
 	;;
     "MATE" | "mate")
 	gsettings set org.mate.media-handling automount false
+	gsettings set org.mate.media-handling automount-open false
+	gsettings set org.gnome.desktop.media-handling automount false
+	gsettings set org.gnome.desktop.media-handling automount-open false
     ;;
 
     "plasma" | "kde")
@@ -128,7 +135,9 @@ case $desktop_environment in
 	;;
     "budgie:gnome" | "Budgie:GNOME" | "budgie-desktop")
 	gsettings set org.gnome.desktop.media-handling automount false
+	gsettings set org.gnome.desktop.media-handling automount-open false
 	gsettings set org.cinnamon.desktop.media-handling automount false
+	gsettings set org.cinnamon.desktop.media-handling automount-open false
 	;;
 
   *)

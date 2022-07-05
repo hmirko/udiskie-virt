@@ -1,3 +1,7 @@
-ACTION=="add", ATTRS{removable}=="1", SUBSYSTEM=="block", OWNER="virtmount", GROUP="virtmount", MODE="0660"
+ACTION=="add", ATTRS{removable}=="1", SUBSYSTEM=="block", GROUP="virtmount"
 
 ACTION=="add", SUBSYSTEMS=="usb", SUBSYSTEM=="block", GROUP="virtmount", MODE="0660"
+
+ACTION=="add", KERNEL=="dm-[0-9]", GROUP="virtmount", MODE="0660"
+
+#, MODE="0660", ENV{UDISKS_AUTO}="0", ENV{UDISKS_PRESENTATION_HIDE}="1", ENV{UDISKS_PRESENTATION_NOPOLICY}="1", ENV{UDISKS_AUTOMOUNT_HINT}="never", ENV{UDISKS_AUTO}="0"
