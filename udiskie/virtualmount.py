@@ -1,4 +1,3 @@
-import asyncio
 import guestfs
 import itertools
 import os
@@ -12,7 +11,8 @@ from pathlib import Path
 
 __all__ = ['VirtualMount', 'set_virtual_environment']
 
-def set_virtual_environment(debug = False):
+
+def set_virtual_environment(debug=False):
     """
     Set environment variables, enabling / disabling debug information
     """
@@ -23,6 +23,7 @@ def set_virtual_environment(debug = False):
 
     os.environ["LIBGUESTFS_TRACE"] = val
     os.environ["LIBGUESTFS_DEBUG"] = val
+
 
 class VirtualMount:
     """Object used to keep track of a virtual mount.
@@ -36,16 +37,16 @@ class VirtualMount:
 
 
     """
-    iterator = itertools.count(start = 0).__next__
+    iterator = itertools.count(start=0).__next__
 
-    def __init__(self, device_path, label = None):
+    def __init__(self, device_path, label=None):
 
         self._log = logging.getLogger(__name__)
 
         self._active = True
         self._id = VirtualMount.iterator()
 
-        if label == None:
+        if label is None:
             self._label = self._int_to_label(self._id)
         elif len(label) == 0:
             self._label = self._int_to_label(self._id)
@@ -56,7 +57,7 @@ class VirtualMount:
         self._mount_path = '/media/virtmount/' + self._label
 
         p = Path(self._mount_path)
-        p.mkdir(mode = 0o770, parents = True, exist_ok = True)
+        p.mkdir(mode=0o770, parents=True, exist_ok=True)
         self._gfs = guestfs.GuestFS(python_return_dict=True)
 #        self._gfs.set_trace(1)
         self._gfs.add_drive_opts(self._device_path,
@@ -142,4 +143,5 @@ class VirtualMount:
 
     def thread_func(self, args):
         self._gfs.mount_local_run()
-        self._log.info(_('virtual mount of {0} at {1} terminated', self._device_path, self._mount_path))
+        msg = 'virtual mount of {0} at {1} terminated'
+        self._log.info(_(msg, self._device_path, self._mount_path))

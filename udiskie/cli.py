@@ -426,7 +426,8 @@ class Daemon(_EntryPoint):
 
         self.notify = Component(self._load_notify)
         self.statusicon = Component(self._load_statusicon)
-        self.automounter = self._load_automounter(automount=options['automount'], virtmount=options['virtmount'])
+        self.automounter = self._load_automounter(automount=options['automount'],
+                                                  virtmount=options['virtmount'])
         self.automounter.activate()
 
         if options['notify']:
@@ -509,7 +510,9 @@ class Daemon(_EntryPoint):
 
     def _load_automounter(self, automount, virtmount):
         import udiskie.automount
-        return udiskie.automount.AutoMounter(self.mounter, automount=automount, virtmount=virtmount)
+        return udiskie.automount.AutoMounter(self.mounter,
+                                             automount=automount,
+                                             virtmount=virtmount)
 
 
 class Mount(_EntryPoint):

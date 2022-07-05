@@ -2,9 +2,6 @@
 Automount utility.
 """
 import sys
-import traceback
-import asyncio
-import os
 
 import logging
 from .locale import _
@@ -15,9 +12,8 @@ import signal
 from .common import DaemonBase
 from .async_ import run_bg
 
-import guestfs
-
 __all__ = ['AutoMounter']
+
 
 class AutoMounter(DaemonBase):
 

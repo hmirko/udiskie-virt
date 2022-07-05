@@ -93,11 +93,10 @@ class Mounter:
 
         # Libguestfs runs outside of python itself.
         # Using environment variables
-        if  self._log.getEffectiveLevel() <= logging.DEBUG:
-            set_virtual_environment(debug = True)
+        if self._log.getEffectiveLevel() <= logging.DEBUG:
+            set_virtual_environment(debug=True)
         else:
-            set_virtual_environment(debug = False)
-
+            set_virtual_environment(debug=False)
 
         """"
         When libguestfs is not closed properly, old mounts will stick around.
@@ -212,7 +211,6 @@ class Mounter:
         self._log.info(_('unmounted {0}', device))
         return True
 
-
     def _is_currently_virtualized(self, device):
         """
         Determine if a device is currently mounted virtually.
@@ -260,8 +258,6 @@ class Mounter:
         self._log.debug(_('unmounting virtualized device {0}', device))
 
         dev_id = device.device_id
-        dev_path = "/dev/disk/by-id/" + dev_id
-        id_label = device.id_label
 
         vmount = self._virtual_mounts.pop(dev_id, None)
         vmount.stop()
@@ -302,10 +298,11 @@ class Mounter:
         dev_path = "/dev/disk/by-id/" + dev_id
         id_label = device.id_label
 
-        virt_mount_obj = VirtualMount(dev_path, label = id_label)
+        virt_mount_obj = VirtualMount(dev_path, label=id_label)
 
         self._virtual_mounts[dev_id] = virt_mount_obj
-        self._log.info(_('virtually mounted {0} on {1}', dev_id, virt_mount_obj.mount_path()))
+        msg = 'virtually mounted {0} on {1}'
+        self._log.info(_(msg, dev_id, virt_mount_obj.mount_path()))
         return True
 
     def virt_cleanup(self):
@@ -587,8 +584,8 @@ class Mounter:
     @_error_boundary
     async def auto_add_virt(self, device, recursive=None, automount=True):
         """
-        Automatically attempt to virtually mount or unlock a device, but be quiet if the
-        device is not supported.
+        Automatically attempt to virtually mount or unlock a device, but
+        be quiet if the device is not supported.
 
         :param device: device object, block device path or mount path
         :param bool recursive: recursively mount and unlock child devices
@@ -596,7 +593,9 @@ class Mounter:
         """
 
         if len(self._virtual_mounts) >= self._virtual_mounts_limit:
-            self._log.info(_('not adding {0}: too many virtual mounts active. Mounting manually circumvents this check (limit = {1})', device, self._virtual_mounts_limit))
+            msg = 'not adding {0}: too many virtual mounts active.'
+            + ' Mounting manually circumvents this check (limit = {1})'
+            self._log.info(_(msg, device, self._virtual_mounts_limit))
             return False
 
         device, created = await self._find_device_losetup(device)
@@ -808,7 +807,6 @@ class Mounter:
         results = await gather(*tasks)
         success = all(results)
         return success
-
 
     async def remove_all(self, detach=False, eject=False, lock=False):
         """

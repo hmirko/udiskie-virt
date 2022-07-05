@@ -66,6 +66,7 @@ class build_mo(Command):
 class install(orig_install):
     pass
 
+
 def fast_entrypoint_script_template():
     """
     Replacement for ``easy_install.ScriptWriter.template`` to generate faster
