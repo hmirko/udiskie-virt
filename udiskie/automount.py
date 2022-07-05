@@ -6,6 +6,9 @@ import traceback
 import asyncio
 import os
 
+import logging
+from .locale import _
+
 # for ctrl-C handling
 import signal
 
@@ -40,11 +43,12 @@ class AutoMounter(DaemonBase):
             'media_added': self.auto_add,
             'device_removed': self.device_removed,
         }
+        self._log = logging.getLogger(__name__)
 
         signal.signal(signal.SIGINT, self.handle_sigint)
 
     def handle_sigint(self, signal, frame):
-        print("Received SIGINT. Shutting down.")
+        self._log.info(_('received SIGINT: shutting down'))
         self.shutdown()
         sys.exit(0)
 
@@ -67,10 +71,7 @@ class AutoMounter(DaemonBase):
         if (self._mounter.is_addable(new_state)
                 and not self._mounter.is_addable(old_state)
                 and not self._mounter.is_removable(old_state)):
-            if self._virtmount:
-                self.auto_add_virt(new_state)
-            else:
-                self.auto_add(new_state)
+            self.auto_add(new_state)
 
     @run_bg
     def auto_add(self, device):
@@ -80,10 +81,9 @@ class AutoMounter(DaemonBase):
             return self._mounter.auto_add(device, automount=self._automount)
 
     def device_removed(self, device):
-        print("Device removed! %s Filesystem?: %s" % (device, device.is_filesystem))
         coroutine = self._mounter.virt_cleanup()
-        val = asyncio.run(coroutine)
-        return val
+#        val = asyncio.run(coroutine)
+        return coroutine
 
     def shutdown(self):
         self._mounter.virtunmount_all()

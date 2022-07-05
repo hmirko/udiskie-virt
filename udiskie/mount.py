@@ -99,8 +99,13 @@ class Mounter:
             set_virtual_environment(debug = False)
 
 
+        """"
+        When libguestfs is not closed properly, old mounts will stick around.
+        cleanin them up
+        """
         self.virt_cleanup()
         self._virtual_mounts = dict()
+        self._virtual_mounts_limit  = 8
 
     def _find_device(self, device_or_path):
         """Find device object from path."""
@@ -331,7 +336,6 @@ class Mounter:
                 continue
             else:
                 fields = line.split(' ')
-                print(fields)
                 # format is
                 # 0            1  2            3+
                 # /device/path on /mount/point ...
@@ -543,15 +547,18 @@ class Mounter:
     @_error_boundary
     async def add_virt(self, device, recursive=None):
         """
-        Mount or unlock the device depending on its type.
+        Virtually mount or unlock the device depending on its type.
 
         :param device: device object, block device path or mount path
         :param bool recursive: recursively mount and unlock child devices
         :returns: whether all attempted operations succeeded
         """
+
         device, created = await self._find_device_losetup(device)
+
         if created and recursive is False:
             return device
+
         if device.is_filesystem:
             success = await self.virtmount(device)
         elif device.is_crypto:
@@ -580,13 +587,18 @@ class Mounter:
     @_error_boundary
     async def auto_add_virt(self, device, recursive=None, automount=True):
         """
-        Automatically attempt to mount or unlock a device, but be quiet if the
+        Automatically attempt to virtually mount or unlock a device, but be quiet if the
         device is not supported.
 
         :param device: device object, block device path or mount path
         :param bool recursive: recursively mount and unlock child devices
         :returns: whether all attempted operations succeeded
         """
+
+        if len(self._virtual_mounts) >= self._virtual_mounts_limit:
+            self._log.info(_('not adding {0}: too many virtual mounts active. Mounting manually circumvents this check (limit = {1})', device, self._virtual_mounts_limit))
+            return False
+
         device, created = await self._find_device_losetup(device)
         if created and recursive is False:
             return device
@@ -783,6 +795,20 @@ class Mounter:
         results = await gather(*tasks)
         success = all(results)
         return success
+
+    async def add_all_virt(self, recursive=False):
+        """
+        Add and virtually mount all handleable devices that available at start.
+
+        :param bool recursive: recursively mount and unlock child devices
+        :returns: whether all attempted operations succeeded
+        """
+        tasks = [self.auto_add_virt(device, recursive=recursive)
+                 for device in self.get_all_handleable_leaves()]
+        results = await gather(*tasks)
+        success = all(results)
+        return success
+
 
     async def remove_all(self, detach=False, eject=False, lock=False):
         """

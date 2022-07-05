@@ -1,0 +1,8 @@
+[Unit]
+Description=The Udiskie automounting daemon with suport for virtual mounting
+
+[Service]
+ExecStart=/path/to/installation --virt --automount --tray
+
+[Install]
+WantedBy=multi-user.target

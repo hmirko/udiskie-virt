@@ -5,6 +5,9 @@ import os
 import threading
 import time
 
+import logging
+from .locale import _
+
 from pathlib import Path
 
 __all__ = ['VirtualMount', 'set_virtual_environment']
@@ -18,8 +21,8 @@ def set_virtual_environment(debug = False):
     else:
         val = "0"
 
-    os.environ["LIBGUESTFS_DEBUG"] = val
     os.environ["LIBGUESTFS_TRACE"] = val
+    os.environ["LIBGUESTFS_DEBUG"] = val
 
 class VirtualMount:
     """Object used to keep track of a virtual mount.
@@ -36,6 +39,9 @@ class VirtualMount:
     iterator = itertools.count(start = 0).__next__
 
     def __init__(self, device_path, label = None):
+
+        self._log = logging.getLogger(__name__)
+
         self._active = True
         self._id = VirtualMount.iterator()
 
@@ -48,8 +54,6 @@ class VirtualMount:
 
         self._device_path = device_path
         self._mount_path = '/media/virtmount/' + self._label
-
-        print(self._mount_path)
 
         p = Path(self._mount_path)
         p.mkdir(mode = 0o770, parents = True, exist_ok = True)
@@ -133,10 +137,9 @@ class VirtualMount:
             self._gfs.close()
 
     def __del__(self):
-        print("destructor")
         if self._active:
             self.deactivate()
 
     def thread_func(self, args):
         self._gfs.mount_local_run()
-        print("Virtual mount of %s at %s terminated." % (self._device_path, self._mount_path))
+        self._log.info(_('virtual mount of {0} at {1} terminated', self._device_path, self._mount_path))

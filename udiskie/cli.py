@@ -440,7 +440,10 @@ class Daemon(_EntryPoint):
         else:
             tasks.append(Future())
         if options['automount']:
-            tasks.append(self.mounter.add_all())
+            if options['virtmount']:
+                tasks.append(self.mounter.add_all_virt())
+            else:
+                tasks.append(self.mounter.add_all())
 
         return gather(*tasks)
 
